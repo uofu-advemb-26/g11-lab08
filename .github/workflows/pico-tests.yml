@@ -1,0 +1,41 @@
+name: Pico tests
+# NOTE: setup the wowki cli token in the github action secrets page
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  wokwi:
+    name: Build and simulate mytest.elf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v20
+
+      - name: Build Pico firmware
+        run: nix build .#default --print-build-logs
+
+      - name: Verify Unity tests in Wokwi
+        uses: wokwi/wokwi-ci-action@v1
+        with:
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
+          path: .
+          elf: result/test/mytest.elf
+          timeout: 15000
+          expect_text: '5 Tests 0 Failures'
+          serial_log_file: wokwi-serial.log
+
+      - name: Upload simulator serial log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wokwi-serial-log
+          path: wokwi-serial.log
+          if-no-files-found: ignore
