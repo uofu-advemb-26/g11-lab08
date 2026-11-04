@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = 'result/test/mytest.elf'
-elf = 'result/test/mytest.elf'
