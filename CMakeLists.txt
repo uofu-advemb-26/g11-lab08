@@ -39,6 +39,16 @@ else()
   set(UNITY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/unity")
 endif()
 
+if(DEFINED CAN_PATH)
+  # Already defined, e.g. -D flag
+elseif(DEFINED ENV{CAN_PATH})
+  # Defined in an environment variable
+  set(CAN_PATH $ENV{CAN_PATH})
+else()
+  # Default to the submodule (make it absolute)
+  set(CAN_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/can2040")
+endif()
+
 if(DEFINED ENV{OPENOCD_PATH})
   set(OPENOCD_PATH $ENV{OPENOCD_PATH})
 endif()
@@ -67,6 +77,9 @@ project(lab00 C CXX ASM)
 
 # These are some macros from the pico SDK that do some setup.
 pico_sdk_init()
+
+# Register the CAN2040 library target and its public header path.
+include(${CAN_PATH}/can2040.cmake)
 
 # This sets a preprocessor value for use in our code.
 add_compile_definitions(configNUMBER_OF_CORES=1 PICO_ENTER_USB_BOOT_ON_EXIT=1)

@@ -1,0 +1,98 @@
+{
+  "nodes": {
+    "can2040": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1730074716,
+        "narHash": "sha256-syMOcr55a872eRpZG1mWjt0pkihRit/3yGo+vysXBpU=",
+        "owner": "uofu-embed",
+        "repo": "can2040",
+        "rev": "d42a69fcb76ebfdfca87484d835a980e873a8d6c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "uofu-embed",
+        "repo": "can2040",
+        "type": "github"
+      }
+    },
+    "freertos": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1723126959,
+        "narHash": "sha256-sWO+gtPfiEHFitXYxYDYzFeZyXH3k+4gupYznVJJGPg=",
+        "ref": "refs/heads/main",
+        "rev": "4f7299d6ea746b27a9dd19e87af568e34bd65b15",
+        "revCount": 3483,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/raspberrypi/FreeRTOS-Kernel.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/raspberrypi/FreeRTOS-Kernel.git"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1787394516,
+        "narHash": "sha256-pRGOQSClnXNI2iLUG6DYpsGvYcuw0drOutVZFTJNw90=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c8f90650c15282fa8656a041bfbbd2403997a9a7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "can2040": "can2040",
+        "rtos-nix": "rtos-nix"
+      }
+    },
+    "rtos-nix": {
+      "inputs": {
+        "freertos": "freertos",
+        "nixpkgs": "nixpkgs",
+        "unity": "unity"
+      },
+      "locked": {
+        "lastModified": 1793813853,
+        "narHash": "sha256-MmpZuatQLXscHpptxDdo8CASzH65jgRZtqw5w8bhCWw=",
+        "owner": "ZainKergayeProjects",
+        "repo": "rtos.nix",
+        "rev": "62ca5f90ae25e528cef48d94c7e673f6d0701c72",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ZainKergayeProjects",
+        "repo": "rtos.nix",
+        "type": "github"
+      }
+    },
+    "unity": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787666923,
+        "narHash": "sha256-8BqlnYKO9tnVT6rAH8iiyVax9BYfhL61w+cLhvuajgI=",
+        "ref": "refs/heads/master",
+        "rev": "2b67b99a4a87db87ff8c28a3b7e405c3e56d65f0",
+        "revCount": 1468,
+        "type": "git",
+        "url": "https://github.com/ThrowTheSwitch/Unity.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://github.com/ThrowTheSwitch/Unity.git"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
