@@ -1,13 +1,22 @@
+#include "FreeRTOS.h"
+#include "pico/cyw43_arch.h"
+#include "queue.h"
+#include "task.h"
 #include <can2040.h>
 #include <hardware/regs/intctrl.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
 
+static QueueHandle_t msg_queue;
+
 static struct can2040 cbus;
+
+#define MSG_PROC_TASK_PRIORITY (tskIDLE_PRIORITY + 1UL)
+#define MSG_PROC_TASK_STACK_SIZE configMINIMAL_STACK_SIZE
 
 static void can2040_cb(struct can2040 *cd, uint32_t notify,
                        struct can2040_msg *msg) {
-  // Put your code here....
+  xQueueSend(msg_queue, (void *)&msg, 10);
 }
 
 static void PIOx_IRQHandler(void) { can2040_pio_irq_handler(&cbus); }
@@ -30,9 +39,23 @@ void canbus_setup(void) {
   can2040_start(&cbus, sys_clock, bitrate, gpio_rx, gpio_tx);
 }
 
+void msg_process_thread() {
+  struct can2040_msg msg;
+  for (;;)
+    if (xQueueReceive(msg_queue, &msg, portMAX_DELAY) == pdTRUE)
+      printf("sad");
+}
+
 int main(void) {
   stdio_init_all();
   canbus_setup();
+
+  msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
+
+  TaskHandle_t task;
+  xTaskCreate(msg_process_thread, "MessageProcessThread",
+              MSG_PROC_TASK_STACK_SIZE, NULL, MSG_PROC_TASK_PRIORITY, &task);
+  vTaskStartScheduler();
 
   while (true) {
     tight_loop_contents();
