@@ -19,7 +19,8 @@ static struct can2040 cbus;
 /* -- MESSAGE PROCESSING LOGIC:
   this is called to process massages:
  */
-static void can2040_cb(struct can2040 *cd, uint32_t notify,struct can2040_msg *msg) {
+static void can2040_cb(struct can2040 *cd, uint32_t notify,
+                       struct can2040_msg *msg) {
   if (notify == CAN2040_NOTIFY_RX) {
     BaseType_t higher_priority_task_woken = pdFALSE;
 
@@ -40,14 +41,9 @@ static void can2040_cb(struct can2040 *cd, uint32_t notify,struct can2040_msg *m
     // remaining two are ignored
 */
 void send_message(void) {
-    struct can2040_msg msg = {
-        .id = HI,
-        .dlc = 2,
-        .data[0] = 'H',
-        .data[1] = 'i',
-        .data[2] = '.'
-    };
-    can2040_transmit(&cbus, &msg);
+  struct can2040_msg msg = {
+      .id = HI, .dlc = 2, .data[0] = 'H', .data[1] = 'i', .data[2] = '.'};
+  can2040_transmit(&cbus, &msg);
 
   vTaskDelay((TickType_t)(1000));
 }
@@ -73,19 +69,12 @@ void canbus_setup(void) {
   can2040_start(&cbus, sys_clock, bitrate, gpio_rx, gpio_tx);
 }
 
-
-static void send_thread(void *pvParameters)
-{
+static void send_thread(void *pvParameters) {
   (void)pvParameters;
 
   while (true) {
     struct can2040_msg msg = {
-      .id = HI,
-      .dlc = 2,
-      .data[0] = 'H',
-      .data[1] = 'i',
-      .data[2] = '.'
-    };
+        .id = HI, .dlc = 2, .data[0] = 'H', .data[1] = 'i', .data[2] = '.'};
     printf("TX CAN ID: 0x%03lx | DLC: %u | Data: %02X %02X\n",
            (unsigned long)msg.id, (unsigned int)msg.dlc, msg.data[0],
            msg.data[1]);
@@ -120,12 +109,11 @@ static void msg_process_thread(void *pvParameters) {
     // Block here until the ISR supplies a CAN message.
     // This uses no CPU time while there is no message.
     if (xQueueReceive(msg_queue, &msg, portMAX_DELAY) == pdTRUE) {
-      printf("CAN ID: 0x%03lx | DLC: %u | Data:",
-            (unsigned long)msg.id,
-            (unsigned int)msg.dlc);
+      printf("RECIEVED: CAN ID: 0x%03lx | DLC: %u | Data:",
+             (unsigned long)msg.id, (unsigned int)msg.dlc);
 
       for (uint8_t i = 0; i < msg.dlc; i++) {
-          printf(" %02X", msg.data[i]);
+        printf(" %02X", msg.data[i]);
       }
 
       printf("\n");
@@ -156,7 +144,6 @@ int main(void) {
                            MSG_PROC_TASK_STACK_SIZE, NULL,
                            MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
   vTaskStartScheduler();
-
 
   while (true) {
     tight_loop_contents();
