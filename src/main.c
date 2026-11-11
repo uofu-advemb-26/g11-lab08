@@ -86,7 +86,28 @@ static void send_thread(void *pvParameters)
       .data[1] = 'i',
       .data[2] = '.'
     };
+    printf("TX CAN ID: 0x%03lx | DLC: %u | Data: %02X %02X\n",
+           (unsigned long)msg.id, (unsigned int)msg.dlc, msg.data[0],
+           msg.data[1]);
     can2040_transmit(&cbus, &msg);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+// This runs independently of CAN.  If it blinks and prints, USB stdio and
+// FreeRTOS are working even if there is no other CAN node on the bus.
+static void status_thread(void *pvParameters) {
+  (void)pvParameters;
+  bool led_on = false;
+
+  // Give the host time to enumerate the USB CDC device before the first line.
+  vTaskDelay(pdMS_TO_TICKS(2000));
+  printf("CAN activity started; USB stdio and FreeRTOS are running.\n");
+
+  for (;;) {
+    led_on = !led_on;
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    printf("heartbeat: LED %s\n", led_on ? "on" : "off");
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -115,15 +136,25 @@ static void msg_process_thread(void *pvParameters) {
 int main(void) {
   stdio_init_all();
 
+  // The Pico W's on-board LED is driven by the CYW43 chip, not a regular GPIO.
+  if (cyw43_arch_init() != 0) {
+    printf("ERROR: could not initialize the Pico W LED controller.\n");
+  }
+
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
   configASSERT(msg_queue != NULL);
 
   canbus_setup();
 
-  xTaskCreate(msg_process_thread, "MessageProcessThread",
-              MSG_PROC_TASK_STACK_SIZE, NULL, MSG_PROC_TASK_PRIORITY, NULL);
-  xTaskCreate(send_thread, "MessageSendThread", MSG_PROC_TASK_STACK_SIZE, NULL,
-              MSG_PROC_TASK_PRIORITY, NULL);
+  configASSERT(xTaskCreate(msg_process_thread, "MessageProcessThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  configASSERT(xTaskCreate(send_thread, "MessageSendThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  configASSERT(xTaskCreate(status_thread, "StatusThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
   vTaskStartScheduler();
 
 
