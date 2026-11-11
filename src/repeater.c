@@ -21,7 +21,12 @@ static struct can2040 cbus;
 
 static void can2040_cb(struct can2040 *cd, uint32_t notify,
                        struct can2040_msg *msg) {
-  xQueueSend(msg_queue, (void *)&msg, 10);
+  if (notify == CAN2040_NOTIFY_RX) {
+    BaseType_t higher_priority_task_woken = pdFALSE;
+
+    xQueueSendFromISR(msg_queue, msg, &higher_priority_task_woken);
+    portYIELD_FROM_ISR(higher_priority_task_woken);
+  }
 }
 
 static void PIOx_IRQHandler(void) { can2040_pio_irq_handler(&cbus); }
@@ -53,9 +58,11 @@ void msg_process_thread() {
 
 int main(void) {
   stdio_init_all();
-  canbus_setup();
 
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
+  configASSERT(msg_queue != NULL);
+
+  canbus_setup();
 
   TaskHandle_t task;
   xTaskCreate(msg_process_thread, "MessageProcessThread",

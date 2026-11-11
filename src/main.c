@@ -20,27 +20,12 @@ static struct can2040 cbus;
   this is called to process massages:
  */
 static void can2040_cb(struct can2040 *cd, uint32_t notify,struct can2040_msg *msg) {
-
-  // received a message
   if (notify == CAN2040_NOTIFY_RX) {
-    BaseType_t wake_task = pdFALSE;
-    portYIELD_FROM_ISR(wake_task);
-    xQueueSendFromISR(
-          msg_queue,
-          msg,
-          &wake_task
-        );
-    // swtich to which ever task is waiting on wake_task imediatly after handler
-    portYIELD_FROM_ISR(wake_task);
-  }
-  // message was transmitted
-  else if (notify == CAN2040_NOTIFY_TX) {
-        // At least one other active CAN node ACKed this frame.
-  }
-  else if (notify == CAN2040_NOTIFY_ERROR) {
-        // can2040 receive buffer overflowed
-  }
+    BaseType_t higher_priority_task_woken = pdFALSE;
 
+    xQueueSendFromISR(msg_queue, msg, &higher_priority_task_woken);
+    portYIELD_FROM_ISR(higher_priority_task_woken);
+  }
 }
 
 /* -- SEND FUNCTION:
@@ -89,22 +74,26 @@ void canbus_setup(void) {
 }
 
 
-void send_thread()
+static void send_thread(void *pvParameters)
 {
-    struct can2040_msg msg;
+  (void)pvParameters;
+
   while (true) {
-        struct can2040_msg msg = {
-        .id = HI,
-        .dlc = 2,
-        .data[0] = 'H',
-        .data[1] = 'i',
-        .data[2] = '.'
+    struct can2040_msg msg = {
+      .id = HI,
+      .dlc = 2,
+      .data[0] = 'H',
+      .data[1] = 'i',
+      .data[2] = '.'
     };
     can2040_transmit(&cbus, &msg);
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
-void msg_process_thread() {
+static void msg_process_thread(void *pvParameters) {
+  (void)pvParameters;
+
   struct can2040_msg msg;
   while (true) {
     // Block here until the ISR supplies a CAN message.
@@ -125,18 +114,16 @@ void msg_process_thread() {
 
 int main(void) {
   stdio_init_all();
-  canbus_setup();
 
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
+  configASSERT(msg_queue != NULL);
 
-  TaskHandle_t task;
+  canbus_setup();
+
   xTaskCreate(msg_process_thread, "MessageProcessThread",
-              MSG_PROC_TASK_STACK_SIZE, NULL, MSG_PROC_TASK_PRIORITY, &task);
-  vTaskStartScheduler();
-
-  TaskHandle_t send;
-  xTaskCreate(send_thread, "MessagesendThread",
-              MSG_PROC_TASK_STACK_SIZE, NULL, MSG_PROC_TASK_PRIORITY, &send);
+              MSG_PROC_TASK_STACK_SIZE, NULL, MSG_PROC_TASK_PRIORITY, NULL);
+  xTaskCreate(send_thread, "MessageSendThread", MSG_PROC_TASK_STACK_SIZE, NULL,
+              MSG_PROC_TASK_PRIORITY, NULL);
   vTaskStartScheduler();
 
 
