@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/lib/can2040/src",
+                "${workspaceFolder}/lib/pico-sdk"
+            ],
+            "defines": [],
+            "compilerPath": "/opt/homebrew/bin/arm-none-eabi-g++",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "macos-clang-arm64"
+        }
+    ],
+    "version": 4
+}

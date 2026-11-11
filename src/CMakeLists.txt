@@ -2,6 +2,7 @@
 add_executable(hello_freertos hello_freertos.c)
 
 add_executable(can_activity main.c)
+add_executable(can_repeater repeater.c)
 
 pico_set_program_name(hello_freertos "test")
 pico_set_program_version(hello_freertos "0.1")
@@ -14,12 +15,18 @@ pico_enable_stdio_usb(hello_freertos 1)
 pico_enable_stdio_uart(can_activity 0)
 pico_enable_stdio_usb(can_activity 1)
 
+pico_enable_stdio_uart(can_repeater 0)
+pico_enable_stdio_usb(can_repeater 1)
+
 # Add the libraries to the build
 target_link_libraries(
   hello_freertos PRIVATE pico_stdlib pico_multicore pico_async_context_freertos
                          FreeRTOS-Kernel-Heap4)
 target_link_libraries(
   can_activity PRIVATE pico_stdlib pico_multicore pico_async_context_freertos
+                       FreeRTOS-Kernel-Heap4 can2040)
+target_link_libraries(
+  can_repeater PRIVATE pico_stdlib pico_multicore pico_async_context_freertos
                        FreeRTOS-Kernel-Heap4 can2040)
 
 # The CYW43 is the Wifi/Bluetooth module. If the board is set to pico_w, this
@@ -28,6 +35,7 @@ if(PICO_CYW43_SUPPORTED)
   # For led support on pico_w
   target_link_libraries(hello_freertos PRIVATE pico_cyw43_arch_none)
   target_link_libraries(can_activity PRIVATE pico_cyw43_arch_none)
+  target_link_libraries(can_repeater PRIVATE pico_cyw43_arch_none)
 endif()
 
 # Another pico macro which generates the uf2 file in addition to the elf

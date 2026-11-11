@@ -1,15 +1,54 @@
+#include "FreeRTOS.h"
+#include "pico/cyw43_arch.h"
+#include "queue.h"
+#include "task.h"
 #include <can2040.h>
 #include <hardware/regs/intctrl.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
 
+static QueueHandle_t msg_queue;
+
 static struct can2040 cbus;
 
+#define HI 0x100
+
+#define MSG_PROC_TASK_PRIORITY (tskIDLE_PRIORITY + 1UL)
+#define MSG_PROC_TASK_STACK_SIZE configMINIMAL_STACK_SIZE
+
+/* -- MESSAGE PROCESSING LOGIC:
+  this is called to process massages:
+ */
 static void can2040_cb(struct can2040 *cd, uint32_t notify,
                        struct can2040_msg *msg) {
-  // Put your code here....
+  if (notify == CAN2040_NOTIFY_RX) {
+    BaseType_t higher_priority_task_woken = pdFALSE;
+
+    xQueueSendFromISR(msg_queue, msg, &higher_priority_task_woken);
+    portYIELD_FROM_ISR(higher_priority_task_woken);
+  }
 }
 
+/* -- SEND FUNCTION:
+    msg.id = 0x123;       // message type / identifier
+    msg.dlc = 6;          // how many bytes you are sending: Max 8
+    msg.data[0] = 'H';
+    msg.data[1] = 'e';
+    msg.data[2] = 'l';
+    msg.data[3] = 'l';
+    msg.data[4] = 'o';
+    msg.data[5] = '!';
+    // remaining two are ignored
+*/
+void send_message(void) {
+  struct can2040_msg msg = {
+      .id = HI, .dlc = 2, .data[0] = 'H', .data[1] = 'i', .data[2] = '.'};
+  can2040_transmit(&cbus, &msg);
+
+  vTaskDelay((TickType_t)(1000));
+}
+
+// -- INTERRUPT FOR HANDLING MESSAGES RX & TX:
 static void PIOx_IRQHandler(void) { can2040_pio_irq_handler(&cbus); }
 
 void canbus_setup(void) {
@@ -30,9 +69,81 @@ void canbus_setup(void) {
   can2040_start(&cbus, sys_clock, bitrate, gpio_rx, gpio_tx);
 }
 
+static void send_thread(void *pvParameters) {
+  (void)pvParameters;
+
+  while (true) {
+    struct can2040_msg msg = {
+        .id = HI, .dlc = 2, .data[0] = 'H', .data[1] = 'i', .data[2] = '.'};
+    printf("TX CAN ID: 0x%03lx | DLC: %u | Data: %02X %02X\n",
+           (unsigned long)msg.id, (unsigned int)msg.dlc, msg.data[0],
+           msg.data[1]);
+    can2040_transmit(&cbus, &msg);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+// This runs independently of CAN.  If it blinks and prints, USB stdio and
+// FreeRTOS are working even if there is no other CAN node on the bus.
+static void status_thread(void *pvParameters) {
+  (void)pvParameters;
+  bool led_on = false;
+
+  // Give the host time to enumerate the USB CDC device before the first line.
+  vTaskDelay(pdMS_TO_TICKS(2000));
+  printf("CAN activity started; USB stdio and FreeRTOS are running.\n");
+
+  for (;;) {
+    led_on = !led_on;
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    printf("heartbeat: LED %s\n", led_on ? "on" : "off");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+static void msg_process_thread(void *pvParameters) {
+  (void)pvParameters;
+
+  struct can2040_msg msg;
+  while (true) {
+    // Block here until the ISR supplies a CAN message.
+    // This uses no CPU time while there is no message.
+    if (xQueueReceive(msg_queue, &msg, portMAX_DELAY) == pdTRUE) {
+      printf("RECIEVED: CAN ID: 0x%03lx | DLC: %u | Data:",
+             (unsigned long)msg.id, (unsigned int)msg.dlc);
+
+      for (uint8_t i = 0; i < msg.dlc; i++) {
+        printf(" %02X", msg.data[i]);
+      }
+
+      printf("\n");
+    }
+  }
+}
+
 int main(void) {
   stdio_init_all();
+
+  // The Pico W's on-board LED is driven by the CYW43 chip, not a regular GPIO.
+  if (cyw43_arch_init() != 0) {
+    printf("ERROR: could not initialize the Pico W LED controller.\n");
+  }
+
+  msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
+  configASSERT(msg_queue != NULL);
+
   canbus_setup();
+
+  configASSERT(xTaskCreate(msg_process_thread, "MessageProcessThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  configASSERT(xTaskCreate(send_thread, "MessageSendThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  configASSERT(xTaskCreate(status_thread, "StatusThread",
+                           MSG_PROC_TASK_STACK_SIZE, NULL,
+                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  vTaskStartScheduler();
 
   while (true) {
     tight_loop_contents();
