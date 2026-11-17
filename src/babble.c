@@ -26,6 +26,14 @@ static volatile uint32_t loud_rx, quiet_rx, loud_tx, quiet_tx;
 static volatile bool quiet_waiting;
 static volatile uint32_t quiet_skipped; // times we couldnt send cause still waiting
 
+// A: busy wait after every babble msg. status task sweeps it 0..400us
+// (or press + / - in the terminal to pick one, a = back to auto sweep)
+static volatile uint32_t delay_us = 0;
+static bool auto_sweep = true;
+#define SWEEP_STEP_US 10
+#define SWEEP_MAX_US 400
+#define SWEEP_SECONDS 2 // how long to sit on each delay
+
 static void can2040_cb(struct can2040 *cd, uint32_t notify,
                        struct can2040_msg *msg) {
   (void)cd;
@@ -72,7 +80,9 @@ static void babble_thread(void *pvParameters) {
     if (can2040_check_transmit(&cbus)) {
       struct can2040_msg msg = {.id = LOUD, .dlc = 8};
       msg.data32[0] = count++;
+      msg.data32[1] = delay_us;
       can2040_transmit(&cbus, &msg);
+      busy_wait_us_32(delay_us); // the lab's "fix": slow the babbler down
     }
   }
 }
@@ -102,15 +112,18 @@ static void status_thread(void *pvParameters) {
            last_quiet_tx = 0, last_skipped = 0;
 
   vTaskDelay(pdMS_TO_TICKS(2000));
+  uint32_t seconds = 0;
 
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(1000));
+    seconds++;
 
     uint32_t lrx = loud_rx, qrx = quiet_rx, ltx = loud_tx, qtx = quiet_tx,
              sk = quiet_skipped;
 #ifdef BABBLER
-    printf("A | babble sent %lu/s | quiet rx %lu/s (B sends 10/s)\n",
-           (unsigned long)(ltx - last_loud_tx),
+    printf("A | delay %3lu us | babble sent %lu/s | quiet rx %lu/s (B sends "
+           "10/s)\n",
+           (unsigned long)delay_us, (unsigned long)(ltx - last_loud_tx),
            (unsigned long)(qrx - last_quiet_rx));
 #else
     printf("B | quiet sent %lu/s skipped %lu/s | babble rx %lu/s\n",
@@ -123,6 +136,25 @@ static void status_thread(void *pvParameters) {
     last_loud_tx = ltx;
     last_quiet_tx = qtx;
     last_skipped = sk;
+
+#ifdef BABBLER
+    int c = getchar_timeout_us(0);
+    if (c == '+') {
+      auto_sweep = false;
+      delay_us += SWEEP_STEP_US;
+    } else if (c == '-' && delay_us >= SWEEP_STEP_US) {
+      auto_sweep = false;
+      delay_us -= SWEEP_STEP_US;
+    } else if (c == 'a') {
+      auto_sweep = true;
+    }
+
+    if (auto_sweep && seconds % SWEEP_SECONDS == 0) {
+      delay_us += SWEEP_STEP_US;
+      if (delay_us > SWEEP_MAX_US)
+        delay_us = 0;
+    }
+#endif
   }
 }
 
