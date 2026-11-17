@@ -11,6 +11,8 @@ static QueueHandle_t msg_queue;
 
 static struct can2040 cbus;
 
+static uint32_t ping_time; // when A sent the last ping (us)
+
 #define HI 0x100   // ping, sent by node A
 #define PONG 0x101 // reply, sent by node B
 
@@ -78,6 +80,7 @@ static void send_thread(void *pvParameters) {
     struct can2040_msg msg = {
         .id = HI, .dlc = 5, .data = {'P', 'I', 'N', 'G', seq}};
     printf("TX PING seq=%u\n", seq);
+    ping_time = time_us_32();
     can2040_transmit(&cbus, &msg);
     seq++;
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -112,6 +115,8 @@ static void msg_process_thread(void *pvParameters) {
     // Block here until the ISR supplies a CAN message.
     // This uses no CPU time while there is no message.
     if (xQueueReceive(msg_queue, &msg, portMAX_DELAY) == pdTRUE) {
+      uint32_t now = time_us_32();
+
       // node B: answer pings right away (before printing so its fast)
       // only one task sends on each node so can2040_transmit is safe
       if (msg.id == HI) {
@@ -128,6 +133,12 @@ static void msg_process_thread(void *pvParameters) {
       }
 
       printf("\n");
+
+      // node A: how long the ping took to come back
+      if (msg.id == PONG) {
+        printf("PONG seq=%u rtt=%lu us\n", msg.data[4],
+               (unsigned long)(now - ping_time));
+      }
     }
   }
 }
