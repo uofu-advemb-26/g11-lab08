@@ -75,3 +75,21 @@ add_custom_target(
   "program $<TARGET_FILE:hello_freertos> verify reset exit"
   DEPENDS hello_freertos
   VERBATIM)
+
+# activity 2 (babbling node). A = can_babbler, B = can_periodic
+add_executable(can_babbler babble.c)
+add_executable(can_periodic babble.c)
+target_compile_definitions(can_babbler PRIVATE BABBLER)
+
+pico_enable_stdio_uart(can_babbler 0)
+pico_enable_stdio_usb(can_babbler 1)
+pico_enable_stdio_uart(can_periodic 0)
+pico_enable_stdio_usb(can_periodic 1)
+
+target_link_libraries(can_babbler PRIVATE pico_stdlib FreeRTOS-Kernel-Heap4
+                                          can2040)
+target_link_libraries(can_periodic PRIVATE pico_stdlib FreeRTOS-Kernel-Heap4
+                                           can2040)
+
+pico_add_extra_outputs(can_babbler)
+pico_add_extra_outputs(can_periodic)
