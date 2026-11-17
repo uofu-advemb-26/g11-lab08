@@ -11,7 +11,8 @@ static QueueHandle_t msg_queue;
 
 static struct can2040 cbus;
 
-#define HI 0x100
+#define HI 0x100   // ping, sent by node A
+#define PONG 0x101 // reply, sent by node B
 
 #define MSG_PROC_TASK_PRIORITY (tskIDLE_PRIORITY + 1UL)
 #define MSG_PROC_TASK_STACK_SIZE configMINIMAL_STACK_SIZE
@@ -72,13 +73,13 @@ void canbus_setup(void) {
 static void send_thread(void *pvParameters) {
   (void)pvParameters;
 
+  uint8_t seq = 0;
   while (true) {
     struct can2040_msg msg = {
-        .id = HI, .dlc = 2, .data[0] = 'H', .data[1] = 'i', .data[2] = '.'};
-    printf("TX CAN ID: 0x%03lx | DLC: %u | Data: %02X %02X\n",
-           (unsigned long)msg.id, (unsigned int)msg.dlc, msg.data[0],
-           msg.data[1]);
+        .id = HI, .dlc = 5, .data = {'P', 'I', 'N', 'G', seq}};
+    printf("TX PING seq=%u\n", seq);
     can2040_transmit(&cbus, &msg);
+    seq++;
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -95,7 +96,9 @@ static void status_thread(void *pvParameters) {
 
   for (;;) {
     led_on = !led_on;
+#ifdef NODE_A
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+#endif
     printf("heartbeat: LED %s\n", led_on ? "on" : "off");
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -109,6 +112,14 @@ static void msg_process_thread(void *pvParameters) {
     // Block here until the ISR supplies a CAN message.
     // This uses no CPU time while there is no message.
     if (xQueueReceive(msg_queue, &msg, portMAX_DELAY) == pdTRUE) {
+      // node B: answer pings right away (before printing so its fast)
+      // only one task sends on each node so can2040_transmit is safe
+      if (msg.id == HI) {
+        struct can2040_msg reply = {
+            .id = PONG, .dlc = 5, .data = {'P', 'O', 'N', 'G', msg.data[4]}};
+        can2040_transmit(&cbus, &reply);
+      }
+
       printf("RECIEVED: CAN ID: 0x%03lx | DLC: %u | Data:",
              (unsigned long)msg.id, (unsigned int)msg.dlc);
 
@@ -124,10 +135,13 @@ static void msg_process_thread(void *pvParameters) {
 int main(void) {
   stdio_init_all();
 
+#ifdef NODE_A
   // The Pico W's on-board LED is driven by the CYW43 chip, not a regular GPIO.
+  // (B is a regular pico so no led there)
   if (cyw43_arch_init() != 0) {
     printf("ERROR: could not initialize the Pico W LED controller.\n");
   }
+#endif
 
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
   configASSERT(msg_queue != NULL);
@@ -137,9 +151,11 @@ int main(void) {
   configASSERT(xTaskCreate(msg_process_thread, "MessageProcessThread",
                            MSG_PROC_TASK_STACK_SIZE, NULL,
                            MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+#ifdef NODE_A // only A pings, B just answers
   configASSERT(xTaskCreate(send_thread, "MessageSendThread",
                            MSG_PROC_TASK_STACK_SIZE, NULL,
                            MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+#endif
   configASSERT(xTaskCreate(status_thread, "StatusThread",
                            MSG_PROC_TASK_STACK_SIZE, NULL,
                            MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
