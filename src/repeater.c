@@ -103,12 +103,12 @@ int main(void) {
 
   canbus_setup();
 
-  configASSERT(xTaskCreate(msg_process_thread, "MessageProcessThread",
-                           MSG_PROC_TASK_STACK_SIZE, NULL,
-                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
-  configASSERT(xTaskCreate(status_thread, "StatusThread",
-                           MSG_PROC_TASK_STACK_SIZE, NULL,
-                           MSG_PROC_TASK_PRIORITY, NULL) == pdPASS);
+  // dont wrap these in configASSERT, its assert() and gets compiled out in
+  // release so the tasks never get made
+  xTaskCreate(msg_process_thread, "MessageProcessThread", MSG_PROC_TASK_STACK_SIZE,
+              NULL, MSG_PROC_TASK_PRIORITY, NULL);
+  xTaskCreate(status_thread, "StatusThread", MSG_PROC_TASK_STACK_SIZE,
+              NULL, MSG_PROC_TASK_PRIORITY, NULL);
   vTaskStartScheduler();
 
   while (true) {
