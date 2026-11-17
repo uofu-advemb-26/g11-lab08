@@ -20,3 +20,13 @@ Both count what they receive and print once a second.
 - Around 225 us (about one frame time) B suddenly gets all 10/s through.
 - Babbler's frames are valid so CAN error handling never stops it. Fallacies:
   "the network is reliable", "bandwidth is infinite".
+
+## Scope (`images/activity2/`)
+
+CH1 CANH, CH2 A TXD, CH3 B TXD.
+
+- Starved: frames back to back, 241 us apart, only ~24 us idle between them (`01`, `03`)
+- B tries every frame and loses arbitration ~25 us in, but still ACKs A (`03`)
+- Both start the frame at the same time and send the same bits until the last
+  id bit (`04`, `05`)
+- Above the cutoff the idle gap grows to ~48 us and B's msgs get through (`06`)
