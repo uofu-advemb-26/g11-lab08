@@ -26,7 +26,7 @@ elseif(DEFINED ENV{FREERTOS_PATH})
   set(FREERTOS_PATH $ENV{FREERTOS_PATH})
 else()
   # Default use the submodule (make it absolute)
-  set(FREERTOS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/freertos")
+  set(FREERTOS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/FreeRTOS")
 endif()
 
 if(DEFINED UNITY_PATH)
