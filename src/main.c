@@ -102,7 +102,13 @@ static void status_thread(void *pvParameters) {
 #ifdef NODE_A
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
 #endif
-    printf("heartbeat: LED %s\n", led_on ? "on" : "off");
+    // if tx_attempt keeps going up but tx doesnt, nobody is acking (check bus)
+    struct can2040_stats stats;
+    can2040_get_statistics(&cbus, &stats);
+    printf("heartbeat: LED %s | rx %lu tx %lu tx_attempt %lu parse_err %lu\n",
+           led_on ? "on" : "off", (unsigned long)stats.rx_total,
+           (unsigned long)stats.tx_total, (unsigned long)stats.tx_attempt,
+           (unsigned long)stats.parse_error);
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
