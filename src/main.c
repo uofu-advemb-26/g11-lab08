@@ -1,5 +1,4 @@
 #include "FreeRTOS.h"
-#include "pico/cyw43_arch.h"
 #include "queue.h"
 #include "task.h"
 #include <can2040.h>
@@ -91,22 +90,17 @@ static void send_thread(void *pvParameters) {
 // FreeRTOS are working even if there is no other CAN node on the bus.
 static void status_thread(void *pvParameters) {
   (void)pvParameters;
-  bool led_on = false;
 
   // Give the host time to enumerate the USB CDC device before the first line.
   vTaskDelay(pdMS_TO_TICKS(2000));
   printf("CAN activity started; USB stdio and FreeRTOS are running.\n");
 
   for (;;) {
-    led_on = !led_on;
-#ifdef NODE_A
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-#endif
     // if tx_attempt keeps going up but tx doesnt, nobody is acking (check bus)
     struct can2040_stats stats;
     can2040_get_statistics(&cbus, &stats);
-    printf("heartbeat: LED %s | rx %lu tx %lu tx_attempt %lu parse_err %lu\n",
-           led_on ? "on" : "off", (unsigned long)stats.rx_total,
+    printf("heartbeat | rx %lu tx %lu tx_attempt %lu parse_err %lu\n",
+           (unsigned long)stats.rx_total,
            (unsigned long)stats.tx_total, (unsigned long)stats.tx_attempt,
            (unsigned long)stats.parse_error);
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -151,14 +145,6 @@ static void msg_process_thread(void *pvParameters) {
 
 int main(void) {
   stdio_init_all();
-
-#ifdef NODE_A
-  // The Pico W's on-board LED is driven by the CYW43 chip, not a regular GPIO.
-  // (B is a regular pico so no led there)
-  if (cyw43_arch_init() != 0) {
-    printf("ERROR: could not initialize the Pico W LED controller.\n");
-  }
-#endif
 
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
   configASSERT(msg_queue != NULL);

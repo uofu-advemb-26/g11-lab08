@@ -4,7 +4,6 @@
  */
 
 #include "FreeRTOS.h"
-#include "pico/cyw43_arch.h"
 #include "queue.h"
 #include "task.h"
 #include <can2040.h>
@@ -74,17 +73,13 @@ static void msg_process_thread(void *pvParameters) {
 // and Pico W on-board LED are all alive.
 static void status_thread(void *pvParameters) {
   (void)pvParameters;
-  bool led_on = false;
 
   // Allow the USB serial device to enumerate before the first diagnostic line.
   vTaskDelay(pdMS_TO_TICKS(2000));
   printf("CAN repeater started; waiting for received CAN frames.\n");
 
   for (;;) {
-    led_on = !led_on;
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-    printf("heartbeat: LED %s | queue depth: %lu\n",
-           led_on ? "on" : "off",
+    printf("heartbeat | queue depth: %lu\n",
            (unsigned long)uxQueueMessagesWaiting(msg_queue));
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -92,11 +87,6 @@ static void status_thread(void *pvParameters) {
 
 int main(void) {
   stdio_init_all();
-
-  // The Pico W LED is controlled by the CYW43 chip rather than a normal GPIO.
-  if (cyw43_arch_init() != 0) {
-    printf("ERROR: could not initialize the Pico W LED controller.\n");
-  }
 
   msg_queue = xQueueCreate(50, sizeof(struct can2040_msg));
   configASSERT(msg_queue != NULL);
