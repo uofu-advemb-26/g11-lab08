@@ -38,5 +38,8 @@ add_custom_target(
   -f
   target/rp2040.cfg
   -c
-  'adapter speed 5000; program "$<TARGET_FILE:mytest>" verify reset exit'
-  DEPENDS mytest)
+  "adapter speed 5000"
+  -c
+  "program $<TARGET_FILE:mytest> verify reset exit"
+  DEPENDS mytest
+  VERBATIM)
